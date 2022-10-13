@@ -1,7 +1,7 @@
 #! /usr/bin/env python3
 
 import json
-from typing import Iterable, List
+from typing import List
 
 import rospy
 from std_msgs.msg import String, Bool
@@ -17,7 +17,7 @@ class TaskMaster(Agent):
         self.name = name
 
         self.cache: State = {}
-        self.goals_q: Iterable[State] = []
+        self.goals_q: List[State] = []
 
         self.plan_publisher = rospy.Publisher(f'/cor/{self.name}/action_graph/plan',
                                               String, latch=True, queue_size=1)
@@ -45,15 +45,20 @@ class TaskMaster(Agent):
         self.goals_q.append(goal)
         rospy.loginfo(f'[{self.name}] Goal appended. Goal: {goal}')
 
+    def estop(self):
+        raise NotImplementedError()
+
     def estop_cb(self, flag: Bool = None):
-        rospy.logerr(f'[{rospy.get_name()}] STOPPING EXECUTION!!')
+        self.estop()
         self.abort()
+        self.goals_q.clear()
+        rospy.logerr(f'[{rospy.get_name()}] ABORTING EXECUTION!!')
 
     def reset_cb(self, flag: Bool = None):
         rospy.logwarn(f'[{rospy.get_name()}] EXECUTION RESET.')
         self.reset()
 
-    def _get_plan_description(self, plan: List[Action]) -> str:
+    def get_plan_description(self, plan: List[Action]) -> str:
         description = ''
         for action in plan:
             description += f'0#{action.__class__.__name__};'
@@ -66,19 +71,14 @@ class TaskMaster(Agent):
         if not self.goals_q:
             return
         #
-        goal: State = self.goals_q.pop(0)
-        # state might have changed since the last step was executed
-        while not self.is_goal_met(goal):
+        try:
+            goal: State = self.goals_q.pop(0)
+            for plan in self.achieve_goal_interactive(goal):
+                self.plan_publisher.publish(self.get_plan_description(plan))
             #
-            try:
-                # (re)generate the plan
-                plan: List[Action] = self.get_plan(goal, self.state)
-                self.plan_publisher.publish(self._get_plan_description(plan))
-                # execute one plan step at a time
-                self.execute_action(plan[0])
-                #
-            except Exception as _ex:
-                self.plan_publisher.publish(str(_ex))
-                rospy.sleep(1)
-                #
-        self.plan_publisher.publish(f"EXECUTION SUCCEDED!")
+            self.plan_publisher.publish(f"GOAL FULFILLED: \n {goal}!")
+            #
+        except Exception as _ex:
+            self.goals_q.clear()
+            self.plan_publisher.publish(f"ERROR! {_ex}")
+            rospy.sleep(1)
