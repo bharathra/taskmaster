@@ -38,12 +38,12 @@ class TaskMaster(Agent):
     def state_received_cb(self, state_dict_str: String):
         state: State = json.loads(state_dict_str.data)
         self.state.update(state)
-        rospy.loginfo(f'[{self.name}] State updated. State: {state}')
+        rospy.loginfo(f'[{rospy.get_name()}] State updated. State: {state}')
 
     def goals_recived_cb(self, goal_dict_str: String):
         goal: State = json.loads(goal_dict_str.data)
         self.goals_q.append(goal)
-        rospy.loginfo(f'[{self.name}] Goal appended. Goal: {goal}')
+        rospy.loginfo(f'[{rospy.get_name()}] Goal appended. Goal: {goal}')
 
     def estop(self):
         raise NotImplementedError()
@@ -52,10 +52,10 @@ class TaskMaster(Agent):
         self.estop()
         self.abort()
         self.goals_q.clear()
-        rospy.logerr(f'[{rospy.get_name()}] ABORTING EXECUTION!!')
+        self.plan_publisher.publish(f'[{rospy.get_name()}] ABORTING EXECUTION!!')
 
     def reset_cb(self, flag: Bool = None):
-        rospy.logwarn(f'[{rospy.get_name()}] EXECUTION RESET.')
+        self.plan_publisher.publish(f'[{rospy.get_name()}] EXECUTION RESET.')
         self.reset()
 
     def get_plan_description(self, plan: List[Action]) -> str:
