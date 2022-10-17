@@ -53,10 +53,12 @@ class TaskMaster(Agent):
         self.abort()
         self.goals_q.clear()
         self.plan_publisher.publish(f'[{rospy.get_name()}] ABORTING EXECUTION!!')
+        rospy.logerr(f'[{rospy.get_name()}] ABORTING EXECUTION!!')
 
     def reset_cb(self, flag: Bool = None):
-        self.plan_publisher.publish(f'[{rospy.get_name()}] EXECUTION RESET.')
         self.reset()
+        self.plan_publisher.publish(f'[{rospy.get_name()}] EXECUTION RESET.')
+        rospy.logwarn(f'[{rospy.get_name()}] EXECUTION RESET.')
 
     def get_plan_description(self, plan: List[Action]) -> str:
         description = ''
@@ -76,9 +78,11 @@ class TaskMaster(Agent):
             for plan in self.achieve_goal_interactive(goal):
                 self.plan_publisher.publish(self.get_plan_description(plan))
             #
-            self.plan_publisher.publish(f"GOAL FULFILLED: \n {goal}!")
+            self.plan_publisher.publish(f"0#COMPLETED; 1#GOAL:{goal};;;")
+            rospy.loginfo(f"COMPLETED: \n {goal}!")
             #
         except Exception as _ex:
             self.goals_q.clear()
-            self.plan_publisher.publish(f"ERROR! {_ex}")
+            self.plan_publisher.publish(f"0#FAILED!; 1#{goal}:{_ex};;;")
+            rospy.logerr(f"FAILED! {_ex}")
             rospy.sleep(1)
