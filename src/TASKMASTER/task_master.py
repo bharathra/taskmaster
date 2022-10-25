@@ -1,9 +1,12 @@
 #! /usr/bin/env python3
 
+import os
 import json
+import yaml
 from typing import List
 
 import rospy
+import rosparam
 from std_msgs.msg import String, Bool
 
 from action_graph import Agent, Action, State
@@ -34,6 +37,21 @@ class TaskMaster(Agent):
 
     def auto_load_actions(self):
         self.load_actions([a(self) for a in Action.__subclasses__()])
+
+    def get_saved_state(self, filepath: str) -> State:
+        #
+        if os.path.exists(filepath):
+            with open(filepath, 'r') as f:
+                yamlfile = yaml.load(f, Loader=yaml.FullLoader)
+            rosparam.upload_params(f'cor/{self.name}/state', yamlfile)
+            state: State = rospy.get_param(f'cor/{self.name}/state/', {})
+            self.save_state(filepath)
+            return state
+            #
+        raise Exception('Error loading robot state config')
+
+    def save_state(self, filepath: str):
+        rosparam.dump_params(filepath, f'cor/{self.name}/state')
 
     def state_received_cb(self, state_dict_str: String):
         state: State = json.loads(state_dict_str.data)
@@ -78,6 +96,7 @@ class TaskMaster(Agent):
             for plan in self.achieve_goal_interactive(goal):
                 self.plan_publisher.publish(self.get_plan_description(plan))
             #
+            # self.cache.clear()
             self.plan_publisher.publish(f"0#COMPLETED; 1#GOAL:{goal};;;")
             rospy.loginfo(f"COMPLETED: \n {goal}!")
             #
