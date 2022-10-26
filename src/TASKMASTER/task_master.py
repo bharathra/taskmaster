@@ -89,6 +89,7 @@ class TaskMaster(Agent):
     def fulfill_goals_in_q(self):
         #
         if not self.goals_q:
+            self.cache.clear()
             return
         #
         try:
@@ -96,7 +97,6 @@ class TaskMaster(Agent):
             for plan in self.achieve_goal_interactive(goal):
                 self.plan_publisher.publish(self.get_plan_description(plan))
             #
-            # self.cache.clear()
             self.plan_publisher.publish(f"0#COMPLETED; 1#GOAL:{goal};;;")
             rospy.loginfo(f"COMPLETED: \n {goal}!")
             #
